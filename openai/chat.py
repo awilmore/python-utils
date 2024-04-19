@@ -105,9 +105,16 @@ def wait_for(client, thread_id, run_id):
     while True:
         run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
 
-        if run.status == "completed":
+        if run.status in ["completed", "failed"]:
+            # Show cost
+            tokens = run.usage.total_tokens
+
             # Finish thinking bubble
-            print(" )\033[0m", flush=True)
+            print(f" [{tokens}] )\033[0m", flush=True)
+
+            # Check for error message
+            if run.last_error:
+                return run.last_error.message
 
             # Get only latest message
             messages = client.beta.threads.messages.list(thread_id=thread_id, limit=1)
