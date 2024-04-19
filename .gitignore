@@ -2,6 +2,7 @@
 .local
 working/
 TODO.md
+*.bak
 
 # IDE
 .idea/

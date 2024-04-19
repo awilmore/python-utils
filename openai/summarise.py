@@ -1,13 +1,16 @@
 #!/usr/bin/python3 -u
 
 """
-Start conversation with ChatGTP
-NOTE: OPENAI_API_KEY env var required
+Summarise the contents of web urls.
+NOTE:
+  - OPENAI_API_KEY env var required
+  - lynx required (brew install lynx)
 """
 
 import os
-import sys
 import signal
+import subprocess
+import sys
 import time
 
 from openai import OpenAI
@@ -17,16 +20,13 @@ from openai import OpenAI
 ###
 
 INSTRUCTIONS = [
-    "Be as helpful as possible",
-    "You are an extremely chilled out surfer guy. You start each response with the word 'yo' and finish with the word 'dude'",
-    "Respond to all questions using the manner in which Yoda speaks",
-    "Respond to all questions as though writing a Shakespearean play",
-    "Respond to all questions with useless, unhelpful and incorrect answers. Be as creative as possible",
-    "Respond to all questions with a creative answer that ultimately results in the number '42'",
-    "Respond to all questions starting with the phrase 'I am a cybernetic organism', then answer the question like Arnold Schwarzenegger would",
-    "When you respond, talk like an Aussie bogan from north queensland",
-    "You must only reply with two words: use 'cells' when it is an objective question and 'interlinked' when it is a subjective question",
+    "Summarise the content into 3 most important points, respond in numbered point form",
+    "Summarise the content into 6 most important points, respond in numbered point form",
+    "Summarise the content into 10 most important points, respond in numbered point form",
 ]
+
+SUMMARY_INSTRUCTION = "System: Summarise the following text using the instructions provided."
+MAX_ARTICLE_LENGTH = 32767 - len(SUMMARY_INSTRUCTION) - 1000
 
 ###
 # MAIN METHOD
@@ -51,15 +51,21 @@ def main():
 
     # Start
     while True:
-        message = input("\033[93m * You: \033[0m")
+        message = input("\033[93m * URL: \033[0m")
         print()
 
         # Check if finished
         if message.strip().lower() == "done":
             break
 
+        # Grab text
+        text = get_page_text(message.strip())
+
+        # Create prompt
+        prompt = template_prompt(text)
+
         # Create a new message for thread
-        client.beta.threads.messages.create(thread_id=thread.id, role="user", content=message)
+        client.beta.threads.messages.create(thread_id=thread.id, role="user", content=prompt)
 
         # Create a new run
         run = client.beta.threads.runs.create(thread_id=thread.id, assistant_id=assistant.id)
@@ -112,10 +118,6 @@ def wait_for(client, thread_id, run_id):
             # Finish thinking bubble
             print(f" [{tokens}] )\033[0m", flush=True)
 
-            # Check for error message
-            if run.last_error:
-                return run.last_error.message
-
             # Get only latest message
             messages = client.beta.threads.messages.list(thread_id=thread_id, limit=1)
             return messages.data[0].content[0].text.value
@@ -125,9 +127,34 @@ def wait_for(client, thread_id, run_id):
             time.sleep(1)
 
 
+# Crawl web url
+def get_page_text(url):
+    # Call lynx process and capture stdout
+    cmd = f"lynx -useragent=\"Mozilla/5.0\" -accept_all_cookies -dump {url}"
+    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = p.communicate()
+
+    # Truncate if necessary
+    if len(out) > MAX_ARTICLE_LENGTH:
+        out = out[0:MAX_ARTICLE_LENGTH]
+
+    # Return text
+    return out
+
+
+# Template prompt (TODO: use a proper prompt template)
+def template_prompt(text):
+    return f"""System: Summarise the following text using the instructions provided.
+    Text: {text}
+    """
+
+
 # Print with green
 def print_as_gpt(text):
-    """Print with green"""
+    # Replace newline characters with double-newline characters
+    text = text.replace("\r", "\n")
+
+    # Print with green
     print("\033[92m * GPT:\033[0m", text)
 
 
