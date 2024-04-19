@@ -1,9 +1,9 @@
 #!/usr/bin/python3 -u
 
-from langchain.chat_models import ChatOpenAI
-from langchain.chains.api import open_meteo_docs, news_docs
-from langchain.chains import APIChain
+from langchain.chains.openai_functions.openapi import get_openapi_chain
+from langchain_openai import ChatOpenAI
 
+import json
 import os
 import signal
 import sys
@@ -23,15 +23,12 @@ NEWS_API_KEY = os.environ.get("NEWSAPI_ORG_KEY")
 ###
 
 def main():
-    # setup the chat model
+    # Setup chat model
     llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY, model_name=OPENAI_MODEL)
 
-    news_chain = APIChain.from_llm_and_api_docs(
-        llm=llm,
-        api_docs=news_docs.NEWS_DOCS,
-        verbose=False,
-        limit_to_domains=["https://newsapi.org"],
-        headers={"X-Api-Key": NEWS_API_KEY},
+    chain = get_openapi_chain(
+        spec="https://www.klarna.com/us/shopping/public/openai/v0/api-docs/",
+        llm=llm
     )
 
     while True:
@@ -43,11 +40,12 @@ def main():
             break
 
         # Run the chain
-        result = news_chain.run(message)
+        r = chain(message)
+        response = json.dumps(r["response"], indent=4)
 
         # Print result
         print("\n")
-        print_as_gpt(result + "\n")
+        print_as_gpt(response + "\n")
 
     # Clean up
     print_as_gpt("Okay bye.\n")
