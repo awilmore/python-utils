@@ -1,4 +1,4 @@
-#!/usr/bin/python3 -u
+#!/usr/bin/env python3
 
 """
 Provide descriptions to generate images using DALL-E 3
